@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "select.h": "c",
+        "ports.h": "c",
+        "unistd.h": "c",
+        "atm.h": "c"
+    }
+}

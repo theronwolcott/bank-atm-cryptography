@@ -1,0 +1,7 @@
+*~
+*.card
+bin/
+*.atm
+*.bank
+*.tar
+
