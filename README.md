@@ -1,64 +1,127 @@
-# ATM Design and Implementation
+# ATM and Bank Protocol Implementation
 
-This is a two-part project, the first of which is a *team* effort,
-while the second is an *individual* effort. Because the second part
-of the project will make use of the results of the first part, only
-submissions that reach a certain threshold of functionality by the
-nominal deadline will be targets for the second part.  The second
-part is due at the end of the semester, so extensions cannot be
-granted.
-
-In this project you will first design and implement a prototype
-ATM/Bank system. Then you will get a chance to (try to) attack other
-teams' designs! We have tried to make these instructions as explicit
-as possible. Read them carefully; *if anything is unclear, please ask
-for clarification well in advance.*
+This project implements a secure communication protocol between an ATM and a bank server, ensuring the integrity and confidentiality of transactions. It uses AES encryption, sequence numbers, and a shared symmetric key for secure message exchanges.
 
 ## Overview
 
- 1. You may work in teams of at most five people. Sign up for your
-    teams on ELMS under "People">"Groups".
+The system consists of three programs:
+1. **`init`**: Initializes the system by generating key files for the bank and ATM.
+2. **`bank`**: Manages user accounts and processes commands such as creating users, depositing money, and checking balances.
+3. **`atm`**: Allows users to interact with the bank securely, supporting operations such as beginning a session, withdrawing money, and checking balances.
 
- 2. You will design and implement three programs: an *ATM*, a *bank*,
-    and an *init* program that initializes state for them. (You may
-    also find it useful to create various auxiliary files defining
-    classes and functionalities that can be used by the ATM and Bank
-    classes.)
+## Features
 
- 3. You will be provided with stub code for the ATM, the bank, and a
-    *router* that will route messages between the ATM and the bank. The
-    stub code will allow the ATM and the router to communicate with each
-    other, and the router and the bank to communicate with each other.
-    The router will be configured to simply pass messages back-and-forth
-    between the ATM and the bank. (Looking ahead, the router will provide
-    a way to carry out passive or active attacks on the "communication
-    channel" between the bank and the ATM.)
+- **Secure Communication**: Messages between the ATM and the bank are encrypted using AES with a shared symmetric key.
+- **Replay Protection**: Each message includes a unique sequence number to prevent replay attacks.
+- **Integrity Assurance**: Encrypted messages ensure that transaction details (e.g., withdrawal amounts, account names) cannot be modified by attackers.
+- **Confidential PIN Verification**: User PINs are encrypted during transmission and verified securely by the bank.
+- **Unlimited Transactions Per Session**: Users can perform multiple operations during a single session.
 
- 4. You will design a protocol allowing a user to withdraw money from
-    the ATM.  Requirements include:
-    
-     * The ATM *card* of user `XXX` will be represented by a file
-       called `XXX.card`.
-     * The user's PIN must be a 4-digit number.
-     * User balances will be maintained by the bank, not by the ATM.
-     * You need **not** support multiple ATMs connecting to the bank
-       simultaneously.
-     * You also do **not** need to maintain state between restarting
-       the bank (e.g., all user balances can be maintained in memory).
-    
-    Of course, as part of the design process you will want to consider
-    security...
+## Security Measures
 
- 5. You will then implement your protocol. Most of your work should
-    involve the ATM, bank, and init programs, with no (or absolutely
-    minimal) modifications to the router.
+### Encryption
+- Messages are encrypted using AES encryption with a unique key generated during initialization.
+- A one-time IV is prepended to each encrypted message to ensure message uniqueness, even for identical transactions.
 
- 6. As with previous projects, the reference platform is the `baseline`
-    docker image. At this point, you should be able to create your own
-    scripts to build and run in a container using this image.
+### Sequence Numbers
+- Every transaction includes a unique sequence number that increments with each message. 
+- Sequence numbers prevent replay attacks by ensuring that old or duplicate transactions are rejected.
 
-Part 1, the team phase of the project, is described in
-[build-it.md](build-it.md).
+### Card Files
+- Each user has a `.card` file containing their encrypted PIN and key information. These files are generated during user creation and are essential for authentication.
 
-Part 2, the solo phase of the project, is described in
-[break-it.md](break-it.md).
+## Vulnerabilities Addressed
+
+1. **Modification of Withdrawal Amounts**: AES encryption prevents attackers from altering withdrawal amounts in transit.
+2. **Modification of Accounts**: Encrypting the entire message ensures attackers cannot change the account associated with a transaction.
+3. **Replay Attacks**: Sequence numbers prevent duplicate transactions from being processed.
+4. **Impersonation of Users**: PINs are encrypted during transmission, making them secure against interception and misuse.
+5. **Unauthorized Transactions**: Encryption of the transaction type prevents attackers from converting balance inquiries into withdrawals.
+
+## Usage
+
+### 1. Initialization
+Run the `init` program to create the required key and configuration files for the bank and ATM:
+
+```bash
+% ./init <init-filename>
+```
+
+### 2. Bank Program
+Start the bank program with the initialization file:
+
+```bash
+% ./bank <init-filename>.bank
+```
+
+The bank program supports the following commands:
+- **`create-user <user-name> <pin> <balance>`**: Creates a new user.
+- **`deposit <user-name> <amount>`**: Adds funds to a user's account.
+- **`balance <user-name>`**: Displays the user's current balance.
+
+### 3. ATM Program
+Start the ATM program with the initialization file:
+
+```bash
+% ./atm <init-filename>.atm
+```
+
+The ATM supports the following commands:
+- **`begin-session <user-name>`**: Starts a session for the specified user after verifying their PIN.
+- **`withdraw <amount>`**: Dispenses funds from the user's account if sufficient funds are available.
+- **`balance`**: Displays the current balance of the logged-in user.
+- **`end-session`**: Ends the current session and logs the user out.
+
+## Example Usage
+
+### Bank Program
+```plaintext
+BANK: create-user Alice 1234 100
+Created user Alice
+
+BANK: balance Alice
+$100
+
+BANK: deposit Alice 50
+$50 added to Alice's account
+
+BANK: balance Alice
+$150
+```
+
+### ATM Program
+```plaintext
+ATM: begin-session Alice
+PIN? 1234
+Authorized
+
+ATM (Alice): balance
+$150
+
+ATM (Alice): withdraw 20
+$20 dispensed
+
+ATM (Alice): balance
+$130
+
+ATM (Alice): end-session
+User logged out
+
+ATM: balance
+No user logged in
+```
+
+## Notes
+
+- **Encryption Requirements**: Ensure OpenSSL is installed to use AES encryption for message security.
+- **Error Handling**: The system is designed to handle various error cases, such as invalid commands, insufficient funds, or unauthorized access.
+- **Resilience**: The system rolls back any changes in case of errors during critical operations, such as user creation or file access.
+
+## Future Improvements
+
+- **Encrypted Bank Responses**: Currently, responses from the bank are not encrypted, as they do not contain sensitive information. Encrypting responses could add an additional layer of security.
+- **Enhanced Authentication**: Adding multi-factor authentication for users could improve security further.
+
+## Conclusion
+
+This project demonstrates a robust implementation of secure communication between an ATM and a bank, leveraging encryption and other mechanisms to address common vulnerabilities and ensure the integrity and confidentiality of financial transactions.
